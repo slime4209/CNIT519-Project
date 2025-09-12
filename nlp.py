@@ -1,113 +1,75 @@
-import nltk
 import pandas as pd
-from nltk.corpus import wordnet as wn
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import classification_report, confusion_matrix
 
-# You may need these once:
-#nltk.download('wordnet')
-#nltk.download('omw-1.4')
-#nltk.download('punkt_tab')
+# === Step 1: Load dataset ===
+csv_path = "Jokes.csv"
+df = pd.read_csv(csv_path)
+df.columns = df.columns.str.strip()
 
-# ---------------------------
-# Load AoA dictionary from CSV
-def load_aoa_csv(csv_file):
-    df = pd.read_csv(csv_file)
-    aoa_dict = {}
-    for _, row in df.iterrows():
-        aoa_dict[row["sense_id"]] = {
-            "word": row["word"].lower(),
-            "gloss": row["sense_gloss"],
-            "aoa": int(row["aoa"])
-        }
-    return aoa_dict
+# Encode label
+y = df["Jokes"].apply(lambda t: 1 if str(t).strip().lower() in ["funny", "yes", "1", "true"] else 0)
 
-# ---------------------------
-# Pretty-print helper
-def pretty_output(input_text, result):
-    print("\n" + "="*50)
-    print(f"INPUT: {input_text}")
-    print("-"*50)
-    if not result["joke"]:
-        print(f"Classification: Not a joke")
-        print(f"Reason: {result['reason']}")
-    else:
-        print(f"Classification: Joke Detected ✅")
-        for detail in result["details"]:
-            print(f"\n  Word with multiple meanings: {detail['word']}")
-            for sense, gloss in detail["senses"].items():
-                print(f"    - {sense}: {gloss}")
-            print(f"  Age appropriate? {'Yes' if detail['age_ok'] else 'No'}")
-            print(f"  Explanation: {detail['explanation']}")
-    print("="*50)
-
-# ---------------------------
-def get_candidate_words(text):
-    """Extract candidate words that have multiple WordNet senses."""
-    words = [w.lower() for w in nltk.word_tokenize(text) if w.isalpha()]
-    candidates = []
-    for w in words:
-        senses = wn.synsets(w)
-        if len(senses) >= 2:
-            candidates.append(w)
-    return list(set(candidates))
-
-# ---------------------------
-def explain_wordplay(word, text, age, aoa_dict):
-    """Check if a word has multiple senses relevant to the text (from CSV AoA)."""
-    # Look up all sense_ids for this word
-    senses = [sid for sid, info in aoa_dict.items() if info["word"] == word]
-    if len(senses) < 2:
-        return None
-
-    # Just pick first 2 senses for now
-    sense1, sense2 = senses[:2]
-    info1, info2 = aoa_dict[sense1], aoa_dict[sense2]
-
-    result = {
-        "word": word,
-        "senses": {
-            sense1: f"({info1['aoa']}+ yrs) {info1['gloss']}",
-            sense2: f"({info2['aoa']}+ yrs) {info2['gloss']}"
-        },
-        "text": text,
-        "age_ok": age >= max(info1["aoa"], info2["aoa"]),
-        "explanation": f"The word '{word}' has multiple meanings ({info1['gloss']} vs {info2['gloss']}). "
-                       f"Both meanings are triggered in the text, creating humor."
-    }
-    return result
-
-# ---------------------------
-def analyze_text(text, age, aoa_dict):
-    """Main pipeline."""
-    candidates = get_candidate_words(text)
-    results = []
+# === Step 2: Create features for training ===
+def create_features(row):
+    text = str(row["Jokes"]).lower()
+    homograph = str(row["Homograph"]).lower() if pd.notna(row["Homograph"]) else ""
+    meaning1 = str(row["Meaning 1"]).lower() if pd.notna(row["Meaning 1"]) else ""
+    meaning2 = str(row["Meaning 2"]).lower() if pd.notna(row["Meaning 2"]) else ""
     
-    if not candidates:
-        return {"joke": False, "reason": "No words with multiple senses found."}
-    
-    for w in candidates:
-        exp = explain_wordplay(w, text, age, aoa_dict)
-        if exp:
-            results.append(exp)
-    
-    if results:
-        return {"joke": True, "details": results}
-    else:
-        return {"joke": False, "reason": "No wordplay fits context."}
+    return pd.Series({
+        "homograph_present": 1 if homograph in text else 0,
+        "meaning1_in_text": 1 if meaning1 and meaning1 in text else 0,
+        "meaning2_in_text": 1 if meaning2 and meaning2 in text else 0,
+    })
 
-# ---------------------------
-# Example usage
-if __name__ == "__main__":
-    # Load AoA data
-    aoa_dict = load_aoa_csv("aoa_data.csv")  # <-- change filename to your CSV
+X = df.apply(create_features, axis=1)
 
-    examples = [
-        "Why don't skeletons fight? Because they have no guts.",
-        "Why do skeletons fight? Because they have no guts.",
-        "I saw a bat in the cave.",
-        "I've got a bad case of shingles."
+# === Step 3: Train/test split ===
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# Train a small decision tree
+clf = DecisionTreeClassifier(random_state=42, max_depth=3)
+clf.fit(X_train, y_train)
+
+# Evaluate
+y_pred = clf.predict(X_test)
+print(classification_report(y_test, y_pred))
+print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
+
+# === Step 4: Automatic prediction on user input ===
+def classify_input(user_text, df_homographs=df):
+    user_text_lower = user_text.lower()
+    
+    # For each homograph in dataset, check if it and its meanings are in the text
+    features = []
+    for idx, row in df_homographs.iterrows():
+        homograph_present = 1 if str(row["Homograph"]).lower() in user_text_lower else 0
+        meaning1_in_text = 1 if str(row["Meaning 1"]).lower() in user_text_lower else 0
+        meaning2_in_text = 1 if str(row["Meaning 2"]).lower() in user_text_lower else 0
+        features.append([homograph_present, meaning1_in_text, meaning2_in_text])
+    
+    # Aggregate features across all homographs: if any is present, use 1
+    agg_features = [
+        1 if any(f[i] == 1 for f in features) else 0
+        for i in range(3)
     ]
     
-    for ex in examples:
-        print("\nINPUT:", ex)
-        output = analyze_text(ex, age=10, aoa_dict=aoa_dict)
-        pretty_output(ex, output)
+    pred = clf.predict([agg_features])[0]
+    label = "Funny" if pred == 1 else "Not Funny"
+    return {
+        "input": user_text,
+        "classification": label
+    }
+
+# Interactive test
+if __name__ == "__main__":
+    while True:
+        user_input = input("Enter a sentence (or 'quit'): ")
+        if user_input.lower() == "quit":
+            break
+        result = classify_input(user_input)
+        print(f"\nClassification: {result['classification']}\n")
