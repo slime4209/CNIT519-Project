@@ -18,5 +18,6 @@ Project 2 Requirements
 Example of homophone joke: I told my students I got stuck in a prison once. Turns out I just could not find my way out of a prism of light. 
 This joke is funny because the words "prison" and "prism" have similar utterances. 
 
+
 Flow Chart of the Project Code
 <img width="1072" height="605" alt="image" src="https://github.com/user-attachments/assets/979bd7fb-2bae-4bb5-8fd8-0522c483a9d7" />
