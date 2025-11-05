@@ -1,5 +1,7 @@
 This project was divided into Project 1 and 2, where Project 2 was built upon the codes written for Project 1. I still need to fix some parts of the code, so it won't be perfect yet.
 
+I included both the .ipynb and .py file in this repo even though the code was originally written in Colab since I can't seem to preview .ipynb files from GitHub. 
+
 Project 1 Requirements
 
 1. Code should ask user for a sentence and age of a person
