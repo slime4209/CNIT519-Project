@@ -1,4 +1,4 @@
-This project was divided into Project 1 and 2, where Project 2 was built upon the codes written for Project 1. 
+This project was divided into Project 1 and 2, where Project 2 was built upon the codes written for Project 1. I still need to fix some parts of the code, so it won't be perfect yet.
 
 Project 1 Requirements
 
@@ -9,6 +9,7 @@ Project 1 Requirements
 
 Example of homograph joke: How does the ocean say hello? It waves!
 This joke is funny because the word "wave" has two meanings: "set waves in" and "signal with the hands or nod"
+
 
 Project 2 Requirements
 1. Code should be able to tell whether the joke creates humor through the use of homographs, homophones (words that are spelled differently but has similar utterances), or neither
